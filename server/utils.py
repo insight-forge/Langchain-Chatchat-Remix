@@ -10,7 +10,7 @@ from configs import (LLM_MODEL, LLM_DEVICE, EMBEDDING_DEVICE,
                      FSCHAT_MODEL_WORKERS, HTTPX_DEFAULT_TIMEOUT)
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from langchain.chat_models import ChatOpenAI
+from langchain.chat_models import ChatOpenAI, AzureChatOpenAI
 import httpx
 from typing import Literal, Optional, Callable, Generator, Dict, Any, Awaitable, Union
 
@@ -40,17 +40,32 @@ def get_ChatOpenAI(
         **kwargs: Any,
 ) -> ChatOpenAI:
     config = get_model_worker_config(model_name)
-    model = ChatOpenAI(
-        streaming=streaming,
-        verbose=verbose,
-        callbacks=callbacks,
-        openai_api_key=config.get("api_key", "EMPTY"),
-        openai_api_base=config.get("api_base_url", fschat_openai_api_address()),
-        model_name=model_name,
-        temperature=temperature,
-        openai_proxy=config.get("openai_proxy"),
-        **kwargs
-    )
+    if config.get("OPENAI_API_TYPE", "") == "azure":
+        import os
+        os.environ["OPENAI_API_TYPE"] = config.get("OPENAI_API_TYPE")
+        os.environ["OPENAI_API_KEY"] = config.get("OPENAI_API_KEY")
+        os.environ["OPENAI_API_VERSION"] = config.get("OPENAI_API_VERSION")
+        os.environ["OPENAI_API_BASE"] = config.get("OPENAI_API_BASE")
+        model = AzureChatOpenAI(
+            streaming=streaming,
+            verbose=verbose,
+            callbacks=callbacks,
+            deployment_name=config.get("DEPLOYMENT_ID"),
+            temperature=temperature,
+            **kwargs
+        )
+    else:
+        model = ChatOpenAI(
+            streaming=streaming,
+            verbose=verbose,
+            callbacks=callbacks,
+            openai_api_key=config.get("api_key", "EMPTY"),
+            openai_api_base=config.get("api_base_url", fschat_openai_api_address()),
+            model_name=model_name,
+            temperature=temperature,
+            openai_proxy=config.get("openai_proxy"),
+            **kwargs
+        )
     return model
 
 

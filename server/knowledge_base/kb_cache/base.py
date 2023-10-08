@@ -122,7 +122,26 @@ class EmbeddingsPool(CachePool):
             with item.acquire(msg="初始化"):
                 self.atomic.release()
                 if model == "text-embedding-ada-002":  # openai text-embedding-ada-002
-                    embeddings = OpenAIEmbeddings(openai_api_key=get_model_path(model), chunk_size=CHUNK_SIZE)
+                    from configs.model_config import ONLINE_EMBEDDING_MODEL
+                    import os
+
+                    config = ONLINE_EMBEDDING_MODEL.get(model, {})
+                    os.environ["OPENAI_API_TYPE"] = config.get("OPENAI_API_TYPE")
+                    os.environ["OPENAI_API_KEY"] = config.get("OPENAI_API_KEY")
+                    os.environ["OPENAI_API_VERSION"] = config.get("OPENAI_API_VERSION")
+                    os.environ["OPENAI_API_BASE"] = config.get("OPENAI_API_BASE")
+                    if config.get("OPENAI_API_TYPE", "") == "azure":
+                        kwargs = {
+                            "deployment": config.get("DEPLOYMENT_ID"),
+                            "chunk_size": CHUNK_SIZE
+                        }
+                    else:
+                        kwargs = {
+                            "model": model,
+                            "chunk_size": CHUNK_SIZE
+                        }
+                    embeddings = OpenAIEmbeddings(**kwargs)
+                    # embeddings = OpenAIEmbeddings(openai_api_key=get_model_path(model), chunk_size=CHUNK_SIZE)
                 elif 'bge-' in model:
                     if 'zh' in model:
                         # for chinese model
