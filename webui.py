@@ -28,14 +28,18 @@ if __name__ == "__main__":
         )
 
     pages = {
-        "对话": {
-            "icon": "chat",
-            "func": dialogue_page,
+        "直播文案和问答": {
+            "icon": "",
+            "func": live_stream_page,
         },
-        "知识库管理": {
-            "icon": "hdd-stack",
-            "func": knowledge_base_page,
-        },
+        # "对话": {
+        #     "icon": "chat",
+        #     "func": dialogue_page,
+        # },
+        # "知识库管理": {
+        #     "icon": "hdd-stack",
+        #     "func": knowledge_base_page,
+        # },
     }
 
     with st.sidebar:
