@@ -11,6 +11,25 @@ from contextlib import contextmanager
 from collections import OrderedDict
 from typing import List, Any, Union, Tuple
 
+class HuggingFaceBgeEmbeddingsAdapter(HuggingFaceBgeEmbeddings):
+    def embed_query(self, text: str) -> List[float]:
+        """Compute query embeddings using a HuggingFace transformer model.
+
+        Args:
+            text: The text to embed.
+
+        Returns:
+            Embeddings for the text.
+        """
+        text = text.replace("\n", " ")
+        print(text)
+        if text.strip().startswith("<question>") and "</question>" in text:
+            text = text.split('</question>')[0][10:]
+        embedding = self.client.encode(
+            self.query_instruction + text, **self.encode_kwargs
+        )
+        return embedding.tolist()
+
 
 class ThreadSafeObject:
     def __init__(self, key: Union[str, Tuple], obj: Any = None, pool: "CachePool" = None):
@@ -152,7 +171,7 @@ class EmbeddingsPool(CachePool):
                     else:
                         # maybe ReRanker or else, just use empty string instead
                         query_instruction = ""
-                    embeddings = HuggingFaceBgeEmbeddings(model_name=get_model_path(model),
+                    embeddings = HuggingFaceBgeEmbeddingsAdapter(model_name=get_model_path(model),
                                                           model_kwargs={'device': device},
                                                           query_instruction=query_instruction)             
                     if model == "bge-large-zh-noinstruct":  # bge large -noinstruct embedding

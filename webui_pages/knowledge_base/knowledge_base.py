@@ -137,16 +137,16 @@ def knowledge_base_page(api: ApiRequest):
 
 
         # with st.sidebar:
-        with st.expander(
-                "文件处理配置",
-                expanded=True,
-        ):
-            cols = st.columns(3)
-            chunk_size = cols[0].number_input("单段文本最大长度：", 1, 1000, CHUNK_SIZE)
-            chunk_overlap = cols[1].number_input("相邻文本重合长度：", 0, chunk_size, OVERLAP_SIZE)
-            cols[2].write("")
-            cols[2].write("")
-            zh_title_enhance = cols[2].checkbox("开启中文标题加强", ZH_TITLE_ENHANCE)
+        # with st.expander(
+        #         "文件处理配置",
+        #         expanded=True,
+        # ):
+        #     cols = st.columns(3)
+        #     chunk_size = cols[0].number_input("单段文本最大长度：", 1, 1000, CHUNK_SIZE)
+        #     chunk_overlap = cols[1].number_input("相邻文本重合长度：", 0, chunk_size, OVERLAP_SIZE)
+        #     cols[2].write("")
+        #     cols[2].write("")
+        #     zh_title_enhance = cols[2].checkbox("开启中文标题加强", ZH_TITLE_ENHANCE)
 
         if st.button(
                 "添加文件到知识库",
@@ -155,10 +155,7 @@ def knowledge_base_page(api: ApiRequest):
         ):
             ret = api.upload_kb_docs(files,
                                      knowledge_base_name=kb,
-                                     override=True,
-                                     chunk_size=chunk_size,
-                                     chunk_overlap=chunk_overlap,
-                                     zh_title_enhance=zh_title_enhance)
+                                     override=True,)
             if msg := check_success_msg(ret):
                 st.toast(msg, icon="✔")
             elif msg := check_error_msg(ret):
@@ -236,10 +233,7 @@ def knowledge_base_page(api: ApiRequest):
             ):
                 file_names = [row["file_name"] for row in selected_rows]
                 api.update_kb_docs(kb,
-                                   file_names=file_names,
-                                   chunk_size=chunk_size,
-                                   chunk_overlap=chunk_overlap,
-                                   zh_title_enhance=zh_title_enhance)
+                                   file_names=file_names,)
                 st.experimental_rerun()
 
             # 将文件从向量库中删除，但不删除文件本身。
@@ -274,10 +268,7 @@ def knowledge_base_page(api: ApiRequest):
             with st.spinner("向量库重构中，请耐心等待，勿刷新或关闭页面。"):
                 empty = st.empty()
                 empty.progress(0.0, "")
-                for d in api.recreate_vector_store(kb,
-                                                chunk_size=chunk_size,
-                                                chunk_overlap=chunk_overlap,
-                                                zh_title_enhance=zh_title_enhance):
+                for d in api.recreate_vector_store(kb):
                     if msg := check_error_msg(d):
                         st.toast(msg)
                     else:

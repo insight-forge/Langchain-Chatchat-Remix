@@ -8,6 +8,7 @@ from configs import LLM_MODEL, TEMPERATURE
 from server.utils import get_model_worker_config
 from typing import List, Dict
 import openai
+from server.knowledge_base.kb_doc_api import search_docs
 
 config = get_model_worker_config("gpt-3.5-turbo")
 openai.api_type = config.get("OPENAI_API_TYPE", "")
@@ -207,6 +208,23 @@ def live_stream_page(api: ApiRequest):
 
         temperature = st.slider("Temperature：", 0.0, 1.0, TEMPERATURE, 0.01)
 
+        def on_kb_change():
+            st.toast(f"已加载知识库： {st.session_state.selected_kb}")
+
+        if dialogue_mode == "商品问答":
+            with st.expander("FAQ库配置", True):
+                kb_list = api.list_knowledge_bases(no_remote_api=True)
+                selected_kb = st.selectbox(
+                    "请选择FAQ库：",
+                    kb_list,
+                    on_change=on_kb_change,
+                    key="selected_kb",
+                )
+                # kb_top_k = st.number_input("匹配知识条数：", 1, 20, VECTOR_SEARCH_TOP_K)
+
+                ## Bge 模型会超过1
+                score_threshold = st.slider("检索匹配分数阈值：", 0.0, 1.0, 1.0, 0.01)
+
     # Display chat messages from history on app rerun
 
     if dialogue_mode == "直播文案":
@@ -334,6 +352,7 @@ def live_stream_page(api: ApiRequest):
         chat_box.output_messages()
         chat_input_placeholder = "请输入关于商品的问题，换行请使用Shift+Enter "
         if prompt := st.chat_input(chat_input_placeholder, key="prompt"):
+            chat_box.user_say(prompt)
             #             replace_dict = {
             #                 '{store_name}':store_name,
             #                 '{product_name}':product_name,
@@ -343,30 +362,52 @@ def live_stream_page(api: ApiRequest):
             #                 '{purchase_notes}': purchase_notes}
 
             #             system_prompt = PRODUCT_QA_SYSTEM.translate(str.maketrans(replace_dict))
-            system_prompt = PRODUCT_QA_SYSTEM.replace('{store_name}', store_name).replace('{product_name}',
-                                                                                          product_name).replace(
-                '{price}', price). \
-                replace('{product_content}', product_content).replace('{purchase_notes}', purchase_notes)
-            messages = [
-                {'role': 'system', 'content': system_prompt},
-                {'role': 'user', 'content': prompt}
-            ]
-            chat_box.user_say(prompt)
-            chat_box.ai_say("正在思考...")
-            text = ""
-            for chunk in openai.ChatCompletion.create(
-                    deployment_id=DEPLOYMENT_ID,
-                    messages=messages,
-                    temperature=temperature,
-                    stream=True, ):
+            docs = search_docs(prompt, selected_kb, 1, score_threshold)
+            if docs:
+                chat_box.ai_say([
+                    f"正在查询知识库 `{selected_kb}` ...",
+                    Markdown("...", in_expander=True, title="知识库匹配结果", state="complete"),
+                ])
+                source_documents = []
+                for inum, doc in enumerate(docs):
+                    print(doc)
+                    filename = os.path.split(doc.metadata["source"])[-1]
+                    # parameters = urlencode({"knowledge_base_name": selected_kb, "file_name":filename})
+                    # url = f"{request.base_url}knowledge_base/download_doc?" + parameters
+                    text = f"""出处 [{inum + 1}] [{filename}]\n
+                            score:{doc.score}\n\n{doc.page_content}\n\n"""
+                    source_documents.append(text)
 
-                if len(chunk["choices"]) > 0 and "delta" in chunk["choices"][0] and "content" in chunk["choices"][0][
-                    "delta"]:
-                    content = chunk["choices"][0]["delta"]["content"]
-                    text += content
-                    chat_box.update_msg(text)
+                context = "\n".join([doc.page_content for doc in docs])
+                context = context.split('<answer>')[-1][:-9]
 
-            chat_box.update_msg(text, streaming=False)  # 更新最终的字符串，去除光标
+                chat_box.update_msg(context, element_index=0, streaming=False)
+                chat_box.update_msg("\n\n".join(source_documents), element_index=1, streaming=False)
+            else:
+                system_prompt = PRODUCT_QA_SYSTEM.replace('{store_name}', store_name).replace('{product_name}',
+                                                                                              product_name).replace(
+                    '{price}', price). \
+                    replace('{product_content}', product_content).replace('{purchase_notes}', purchase_notes)
+                messages = [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': prompt}
+                ]
+                chat_box.ai_say("正在思考...")
+                text = ""
+                for chunk in openai.ChatCompletion.create(
+                        deployment_id=DEPLOYMENT_ID,
+                        messages=messages,
+                        temperature=temperature,
+                        stream=True, ):
+
+                    if len(chunk["choices"]) > 0 and "delta" in chunk["choices"][0] and "content" in \
+                            chunk["choices"][0][
+                                "delta"]:
+                        content = chunk["choices"][0]["delta"]["content"]
+                        text += content
+                        chat_box.update_msg(text)
+
+                chat_box.update_msg(text, streaming=False)  # 更新最终的字符串，去除光标
 
 #     with st.sidebar:
 
