@@ -1,4 +1,5 @@
 import os
+import copy
 
 from transformers import AutoTokenizer
 
@@ -304,16 +305,29 @@ class KnowledgeFile:
         if not docs:
             return []
         if self.ext not in [".csv"]:
-            if text_splitter is None:
-                text_splitter = make_text_splitter(splitter_name=self.text_splitter_name, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-            if self.text_splitter_name == "MarkdownHeaderTextSplitter":
-                docs = text_splitter.split_text(docs[0].page_content)
-                for doc in docs:
-                    # 如果文档有元数据
-                    if doc.metadata:
-                        doc.metadata["source"] = os.path.basename(self.filepath)
-            else:
-                docs = text_splitter.split_documents(docs)
+            # if text_splitter is None:
+            #     text_splitter = make_text_splitter(splitter_name=self.text_splitter_name, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            # if self.text_splitter_name == "MarkdownHeaderTextSplitter":
+            #     docs = text_splitter.split_text(docs[0].page_content)
+            #     for doc in docs:
+            #         # 如果文档有元数据
+            #         if doc.metadata:
+            #             doc.metadata["source"] = os.path.basename(self.filepath)
+            # else:
+            #     docs = text_splitter.split_documents(docs)
+
+            texts = [doc.page_content for doc in docs]
+            metadatas = [doc.metadata for doc in docs]
+
+            _metadatas = metadatas or [{}] * len(texts)
+            documents = []
+            for i, text in enumerate(texts):
+                for chunk in text.split('\n\n'):
+                    new_doc = Document(
+                        page_content=chunk, metadata=copy.deepcopy(_metadatas[i])
+                    )
+                    documents.append(new_doc)
+            docs = documents
 
         print(f"文档切分示例：{docs[0]}")
         if zh_title_enhance:
